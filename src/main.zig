@@ -16,5 +16,5 @@ pub fn main() !void {
     });
     defer cli.deinit();
 
-    try cli.problemInfo();
+    try cli.problemInfo("427411");
 }

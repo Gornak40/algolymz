@@ -25,9 +25,9 @@ pub fn deinit(self: *Self) void {
     self.hcli.deinit();
 }
 
-pub fn problemInfo(self: *Self) !void {
+pub fn problemInfo(self: *Self, problemId: []const u8) !void {
     std.log.info("Prepare problem.info request", .{});
-    try sendApi(self, "problem.info");
+    try sendApi(self, "problem.info", .{ .problemId = problemId });
 }
 
 const ApiParam = struct {
@@ -80,7 +80,13 @@ fn apiParamSig(self: *Self, api_method: []const u8, params: []ApiParam) ![sig_le
     return sign;
 }
 
-fn sendApi(self: *Self, api_method: []const u8) !void {
+fn sendApi(self: *Self, api_method: []const u8, args: anytype) !void {
+    const ArgsType = @TypeOf(args);
+    const args_type_info = @typeInfo(ArgsType);
+    if (args_type_info != .Struct) {
+        @compileError("expected struct argument, found " ++ @typeName(ArgsType));
+    }
+
     const url = try std.fmt.allocPrint(self.alloc, "{s}/api/{s}", .{ self.cfg.polygon_url, api_method });
     defer self.alloc.free(url);
     std.log.info("Prepare URL: {s}", .{url});
@@ -91,6 +97,15 @@ fn sendApi(self: *Self, api_method: []const u8) !void {
     const time = try std.fmt.allocPrint(self.alloc, "{d}", .{std.time.timestamp()});
     defer self.alloc.free(time);
     try params.append(.{ .name = "time", .value = time });
+
+    const fields_info = args_type_info.Struct.fields;
+    inline for (fields_info) |field| {
+        const param = ApiParam{
+            .name = field.name,
+            .value = @field(args, field.name),
+        };
+        try params.append(param);
+    }
 
     const sign = try apiParamSig(self, api_method, params.items);
     try params.append(.{ .name = "apiSig", .value = &sign });
