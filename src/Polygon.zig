@@ -1,4 +1,5 @@
 const std = @import("std");
+const Sha512 = std.crypto.hash.sha2.Sha512;
 
 pub const Config = struct {
     polygon_url: []const u8 = "https://polygon.codeforces.com",
@@ -26,7 +27,7 @@ pub fn deinit(self: *Self) void {
 
 pub fn problemInfo(self: *Self) !void {
     std.log.info("Prepare problem.info request", .{});
-    try self.sendApi("problem.info");
+    try sendApi(self, "problem.info");
 }
 
 const ApiParam = struct {
@@ -42,9 +43,8 @@ const ApiParam = struct {
     }
 };
 
-fn apiParamsToBody(alloc: std.mem.Allocator, params: []ApiParam) ![]const u8 {
-    std.mem.sort(ApiParam, params, {}, ApiParam.lessThan);
-    var buf = std.ArrayList(u8).init(alloc);
+fn apiParamsToBody(self: *Self, params: []ApiParam) ![]const u8 {
+    var buf = std.ArrayList(u8).init(self.alloc);
     errdefer buf.deinit();
     for (params) |p| {
         try std.fmt.format(buf.writer(), "{s}={s}&", p);
@@ -52,8 +52,32 @@ fn apiParamsToBody(alloc: std.mem.Allocator, params: []ApiParam) ![]const u8 {
     if (params.len > 0) {
         _ = buf.pop();
     }
-    std.log.info("Prepare body {s}", .{buf.items});
     return buf.toOwnedSlice();
+}
+
+const rand_str = "gorill";
+const sig_length = rand_str.len + Sha512.digest_length * 2;
+
+fn apiParamSig(self: *Self, api_method: []const u8, params: []ApiParam) ![sig_length]u8 {
+    var buf = std.ArrayList(u8).init(self.alloc);
+    defer buf.deinit();
+    try std.fmt.format(buf.writer(), "{s}/{s}?", .{ rand_str, api_method });
+
+    std.mem.sort(ApiParam, params, {}, ApiParam.lessThan);
+    for (params) |p| {
+        try std.fmt.format(buf.writer(), "{s}={s}&", p);
+    }
+    if (params.len > 0) {
+        _ = buf.pop();
+    }
+
+    try std.fmt.format(buf.writer(), "#{s}", .{self.cfg.api_secret});
+    var out: [Sha512.digest_length]u8 = undefined;
+    Sha512.hash(buf.items, &out, .{});
+    var sign: [sig_length]u8 = undefined;
+    @memcpy(sign[0..rand_str.len], rand_str);
+    @memcpy(sign[rand_str.len..], &std.fmt.bytesToHex(out, .lower));
+    return sign;
 }
 
 fn sendApi(self: *Self, api_method: []const u8) !void {
@@ -63,14 +87,17 @@ fn sendApi(self: *Self, api_method: []const u8) !void {
 
     var params = std.ArrayList(ApiParam).init(self.alloc);
     defer params.deinit();
-    try params.append(.{ .name = "apiKey", .value = self.cfg.api_secret });
+    try params.append(.{ .name = "apiKey", .value = self.cfg.api_key });
     const time = try std.fmt.allocPrint(self.alloc, "{d}", .{std.time.timestamp()});
     defer self.alloc.free(time);
     try params.append(.{ .name = "time", .value = time });
 
-    const body = try apiParamsToBody(self.alloc, params.items);
+    const sign = try apiParamSig(self, api_method, params.items);
+    try params.append(.{ .name = "apiSig", .value = &sign });
+
+    const body = try apiParamsToBody(self, params.items);
     defer self.alloc.free(body);
-    try self.sendRaw(url, body);
+    try sendRaw(self, url, body);
 }
 
 fn sendRaw(self: *Self, url: []const u8, body: []const u8) !void {
