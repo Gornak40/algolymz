@@ -7,10 +7,6 @@ pub const Config = struct {
     api_secret: []const u8,
 };
 
-pub const ApiError = error{
-    BadStatusCode,
-};
-
 const Self = @This();
 
 alloc: std.mem.Allocator,
@@ -31,6 +27,14 @@ pub fn deinit(self: *Self) void {
 
 pub fn problemInfo(self: *Self, problemId: []const u8) !void {
     try sendApi(self, "problem.info", .{ .problemId = problemId });
+}
+
+fn Result(comptime T: type) type {
+    return struct {
+        status: []const u8,
+        comment: []const u8,
+        result: T,
+    };
 }
 
 const ApiParam = struct {
@@ -117,31 +121,35 @@ fn sendApi(self: *Self, api_method: []const u8, args: anytype) !void {
 
     const body = try apiParamsToBody(self, params.items);
     defer self.alloc.free(body);
-    try sendRaw(self, url, body);
+    const resp = try sendRaw(self, url, body);
+    defer self.alloc.free(resp);
+    // TODO: parse resp
 }
 
-fn sendRaw(self: *Self, url: []const u8, body: []const u8) !void {
+fn sendRaw(self: *Self, url: []const u8, body: []const u8) ![]const u8 {
     const uri = try std.Uri.parse(url);
-    var head: [4096]u8 = undefined;
+    var head_buf: [4096]u8 = undefined;
     var req = try self.hcli.open(.POST, uri, .{
-        .server_header_buffer = &head,
+        .server_header_buffer = &head_buf,
     });
     defer req.deinit();
-    req.transfer_encoding = .{
-        .content_length = body.len,
-    };
+    req.transfer_encoding = .{ .content_length = body.len };
     req.headers.content_type = .{ .override = "application/x-www-form-urlencoded" };
+
     try req.send();
-    std.log.info("Send request body, bytes: {d}", .{body.len});
+    std.log.info("Sending request body ({} bytes)", .{body.len});
     try req.writeAll(body);
     try req.finish();
     try req.wait();
 
-    std.log.info("Response status: {d}", .{@intFromEnum(req.response.status)});
-    const resp = try req.reader().readAllAlloc(self.alloc, 4096);
-    defer self.alloc.free(resp);
-    std.log.info("Response body: {s}", .{resp});
+    std.log.info("Response status: {}", .{@intFromEnum(req.response.status)});
+    var resp_list = try std.ArrayList(u8).initCapacity(self.alloc, 4096);
+    try req.reader().readAllArrayList(&resp_list, 4096);
+    errdefer resp_list.deinit();
+    errdefer std.log.err("Response body: {s}", .{resp_list.items});
+
     if (req.response.status != .ok) {
-        return ApiError.BadStatusCode;
+        return error.BadStatusCode;
     }
+    return resp_list.toOwnedSlice();
 }
