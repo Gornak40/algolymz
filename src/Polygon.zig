@@ -7,6 +7,10 @@ pub const Config = struct {
     api_secret: []const u8,
 };
 
+pub const ApiError = error{
+    BadStatusCode,
+};
+
 const Self = @This();
 
 alloc: std.mem.Allocator,
@@ -26,7 +30,6 @@ pub fn deinit(self: *Self) void {
 }
 
 pub fn problemInfo(self: *Self, problemId: []const u8) !void {
-    std.log.info("Prepare problem.info request", .{});
     try sendApi(self, "problem.info", .{ .problemId = problemId });
 }
 
@@ -81,6 +84,8 @@ fn apiParamSig(self: *Self, api_method: []const u8, params: []ApiParam) ![sig_le
 }
 
 fn sendApi(self: *Self, api_method: []const u8, args: anytype) !void {
+    std.log.info("Invoke {s} request", .{api_method});
+
     const ArgsType = @TypeOf(args);
     const args_type_info = @typeInfo(ArgsType);
     if (args_type_info != .Struct) {
@@ -127,7 +132,7 @@ fn sendRaw(self: *Self, url: []const u8, body: []const u8) !void {
     };
     req.headers.content_type = .{ .override = "application/x-www-form-urlencoded" };
     try req.send();
-    std.log.info("Send request...", .{});
+    std.log.info("Send request body, bytes: {d}", .{body.len});
     try req.writeAll(body);
     try req.finish();
     try req.wait();
@@ -136,4 +141,7 @@ fn sendRaw(self: *Self, url: []const u8, body: []const u8) !void {
     const resp = try req.reader().readAllAlloc(self.alloc, 4096);
     defer self.alloc.free(resp);
     std.log.info("Response body: {s}", .{resp});
+    if (req.response.status != .ok) {
+        return ApiError.BadStatusCode;
+    }
 }
