@@ -33,9 +33,22 @@ pub const Package = struct {
     id: i32,
     revision: i32,
     creationTimeSeconds: i32,
-    state: []const u8,
+    state: State,
     comment: []const u8,
-    type: []const u8,
+    type: Type,
+
+    pub const State = enum {
+        PENDING,
+        RUNNING,
+        READY,
+        FAILED,
+    };
+
+    pub const Type = enum {
+        standard,
+        linux,
+        windows,
+    };
 };
 
 pub const Problem = struct {
@@ -44,10 +57,16 @@ pub const Problem = struct {
     name: []const u8,
     deleted: bool,
     favourite: bool,
-    accessType: []const u8,
+    accessType: AccessType,
     revision: i32,
     latestPackage: ?i32 = null,
     modified: bool,
+
+    pub const AccessType = enum {
+        READ,
+        WRITE,
+        OWNER,
+    };
 };
 
 pub const ProblemInfo = struct {
@@ -60,9 +79,21 @@ pub const ProblemInfo = struct {
 
 pub const TestGroup = struct {
     name: []const u8,
-    pointsPolicy: []const u8,
-    feedbackPolicy: []const u8,
+    pointsPolicy: PointsPolicy,
+    feedbackPolicy: FeedbackPolicy,
     dependencies: [][]const u8,
+
+    pub const PointsPolicy = enum {
+        COMPLETE_GROUP,
+        EACH_TEST,
+    };
+
+    pub const FeedbackPolicy = enum {
+        NONE,
+        POINTS,
+        ICPC,
+        COMPLETE,
+    };
 };
 
 pub const TestsetOption = struct {
@@ -82,7 +113,7 @@ pub fn problemEnablePoints(self: *Self, problemId: i32, enable: bool) !void {
 }
 
 /// Enable or disable test groups for the specified testset.
-pub fn problemEnableGroups(self: *Self, problemId: i32, testset: TestsetOption, enable: bool) !void {
+pub fn problemEnableGroups(self: *Self, problemId: i32, enable: bool, testset: TestsetOption) !void {
     const args = .{ .problemId = problemId, .enable = enable, .testset = testset.name };
     try sendApi(self, void, "problem.enableGroups", args);
 }
@@ -114,14 +145,17 @@ pub fn problemViewTags(self: *Self, problemId: i32) ![][]const u8 {
 /// Returns test groups for the specified testset.
 ///
 /// Pass `null` to `group` to get all test groups.
-pub fn problemViewTestGroup(self: *Self, problemId: i32, testset: TestsetOption, group: ?[]const u8) ![]TestGroup {
+pub fn problemViewTestGroup(self: *Self, problemId: i32, group: ?[]const u8, testset: TestsetOption) ![]TestGroup {
     const args = .{ .problemId = problemId, .testset = testset.name, .group = group };
     return try sendApi(self, []TestGroup, "problem.viewTestGroup", args);
 }
 
 fn Result(comptime T: type) type {
     return struct {
-        status: []const u8,
+        status: enum {
+            OK,
+            FAILED,
+        },
         comment: ?[]const u8 = null,
         result: if (T == void) ?struct {} else ?T = null,
     };
@@ -228,10 +262,10 @@ fn sendApi(self: *Self, comptime T: type, api_method: []const u8, args: anytype)
         return err;
     };
     errdefer std.log.err("Polygon comment: {?s}", .{result.comment});
-    if (std.mem.eql(u8, result.status, "FAILED")) {
-        return error.PolygonRequestFailed;
-    }
-    return if (T == void) {} else result.result.?;
+    return switch (result.status) {
+        .OK => if (T == void) {} else result.result.?,
+        .FAILED => error.PolygonRequestFailed,
+    };
 }
 
 fn sendRaw(self: *Self, url: []const u8, body: []const u8) ![]const u8 {

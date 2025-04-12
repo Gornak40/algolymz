@@ -22,16 +22,16 @@ pub fn main() !void {
     }
     std.log.info("Description: {s}", .{try cli.problemViewGeneralDescription(id)});
     for (try cli.problemPackages(id)) |package| {
-        std.log.info("Problem package: {} {} {s}", .{ package.id, package.revision, package.type });
+        std.log.info("Problem package: {} {} {}", .{ package.id, package.revision, @intFromEnum(package.type) });
     }
     std.log.info("Build full package with verify", .{});
     cli.problemBuildPackage(id, true, true) catch |err| {
         std.log.err("{}", .{err});
     };
-    try cli.problemEnableGroups(id, .{}, true);
+    try cli.problemEnableGroups(id, true, .{});
     try cli.problemEnablePoints(id, true);
-    for (try cli.problemViewTestGroup(id, .{}, null)) |group| {
-        std.log.info("Test group: {s} {s} {s}", .{ group.name, group.pointsPolicy, group.feedbackPolicy });
+    for (try cli.problemViewTestGroup(id, null, .{})) |group| {
+        std.log.info("Test group: {s} {} {}", .{ group.name, @intFromEnum(group.pointsPolicy), @intFromEnum(group.feedbackPolicy) });
     }
 }
 
