@@ -10,30 +10,43 @@ pub const Config = struct {
 const Self = @This();
 
 alloc: std.mem.Allocator,
-hcli: std.http.Client,
-cfg: Config,
+client: std.http.Client,
+config: Config,
 
-pub fn init(alloc: std.mem.Allocator, cfg: Config) Self {
+var arena: std.heap.ArenaAllocator = undefined;
+
+pub fn init(alloc: std.mem.Allocator, config: Config) Self {
+    arena = std.heap.ArenaAllocator.init(alloc);
     return .{
         .alloc = alloc,
-        .hcli = .{ .allocator = alloc }, // TODO: make it thread safe.
-        .cfg = cfg,
+        .client = .{ .allocator = alloc }, // TODO: make it thread safe.
+        .config = config,
     };
 }
 
 pub fn deinit(self: *Self) void {
-    self.hcli.deinit();
+    arena.deinit();
+    self.client.deinit();
 }
 
-pub fn problemInfo(self: *Self, problemId: []const u8) !void {
-    try sendApi(self, "problem.info", .{ .problemId = problemId });
+pub const ProblemInfo = struct {
+    inputFile: []const u8,
+    outputFile: []const u8,
+    interactive: bool,
+    timeLimit: i32,
+    memoryLimit: i32,
+};
+
+pub fn problemInfo(self: *Self, problemId: []const u8) !ProblemInfo {
+    const args = .{ .problemId = problemId };
+    return try sendApi(self, ProblemInfo, "problem.info", args);
 }
 
 fn Result(comptime T: type) type {
     return struct {
         status: []const u8,
-        comment: []const u8,
-        result: T,
+        comment: ?[]const u8 = null,
+        result: ?T = null,
     };
 }
 
@@ -78,7 +91,7 @@ fn apiParamSig(self: *Self, api_method: []const u8, params: []ApiParam) ![sig_le
         _ = buf.pop();
     }
 
-    try std.fmt.format(buf.writer(), "#{s}", .{self.cfg.api_secret});
+    try std.fmt.format(buf.writer(), "#{s}", .{self.config.api_secret});
     var out: [Sha512.digest_length]u8 = undefined;
     Sha512.hash(buf.items, &out, .{});
     var sign: [sig_length]u8 = undefined;
@@ -87,7 +100,7 @@ fn apiParamSig(self: *Self, api_method: []const u8, params: []ApiParam) ![sig_le
     return sign;
 }
 
-fn sendApi(self: *Self, api_method: []const u8, args: anytype) !void {
+fn sendApi(self: *Self, comptime T: type, api_method: []const u8, args: anytype) !T {
     std.log.info("Invoke {s} request", .{api_method});
 
     const ArgsType = @TypeOf(args);
@@ -96,15 +109,15 @@ fn sendApi(self: *Self, api_method: []const u8, args: anytype) !void {
         @compileError("expected struct argument, found " ++ @typeName(ArgsType));
     }
 
-    const url = try std.fmt.allocPrint(self.alloc, "{s}/api/{s}", .{ self.cfg.polygon_url, api_method });
+    const url = try std.fmt.allocPrint(self.alloc, "{s}/api/{s}", .{ self.config.polygon_url, api_method });
     defer self.alloc.free(url);
     std.log.info("Prepare URL: {s}", .{url});
 
     var params = std.ArrayList(ApiParam).init(self.alloc);
     defer params.deinit();
-    try params.append(.{ .name = "apiKey", .value = self.cfg.api_key });
-    const time = try std.fmt.allocPrint(self.alloc, "{d}", .{std.time.timestamp()});
-    defer self.alloc.free(time);
+    try params.append(.{ .name = "apiKey", .value = self.config.api_key });
+    var timeBuf: [14]u8 = undefined;
+    const time = try std.fmt.bufPrint(&timeBuf, "{d}", .{std.time.timestamp()});
     try params.append(.{ .name = "time", .value = time });
 
     const fields_info = args_type_info.Struct.fields;
@@ -123,15 +136,22 @@ fn sendApi(self: *Self, api_method: []const u8, args: anytype) !void {
     defer self.alloc.free(body);
     const resp = try sendRaw(self, url, body);
     defer self.alloc.free(resp);
-    // TODO: parse resp
+
+    const result = std.json.parseFromSliceLeaky(Result(T), arena.allocator(), resp, .{ .allocate = .alloc_always }) catch |err| {
+        std.log.err("Bad response: {s}", .{resp});
+        return err;
+    };
+    errdefer std.log.err("Polygon comment: {?s}", .{result.comment});
+    if (std.mem.eql(u8, result.status, "FAILED")) {
+        return error.PolygonRequestFailed;
+    }
+    return result.result.?;
 }
 
 fn sendRaw(self: *Self, url: []const u8, body: []const u8) ![]const u8 {
     const uri = try std.Uri.parse(url);
     var head_buf: [4096]u8 = undefined;
-    var req = try self.hcli.open(.POST, uri, .{
-        .server_header_buffer = &head_buf,
-    });
+    var req = try self.client.open(.POST, uri, .{ .server_header_buffer = &head_buf });
     defer req.deinit();
     req.transfer_encoding = .{ .content_length = body.len };
     req.headers.content_type = .{ .override = "application/x-www-form-urlencoded" };
@@ -144,12 +164,7 @@ fn sendRaw(self: *Self, url: []const u8, body: []const u8) ![]const u8 {
 
     std.log.info("Response status: {}", .{@intFromEnum(req.response.status)});
     var resp_list = try std.ArrayList(u8).initCapacity(self.alloc, 4096);
-    try req.reader().readAllArrayList(&resp_list, 4096);
     errdefer resp_list.deinit();
-    errdefer std.log.err("Response body: {s}", .{resp_list.items});
-
-    if (req.response.status != .ok) {
-        return error.BadStatusCode;
-    }
+    try req.reader().readAllArrayList(&resp_list, 4096);
     return resp_list.toOwnedSlice();
 }
