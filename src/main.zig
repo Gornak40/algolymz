@@ -30,6 +30,9 @@ pub fn main() !void {
     };
     try cli.problemEnableGroups(id, .{}, true);
     try cli.problemEnablePoints(id, true);
+    for (try cli.problemViewTestGroup(id, .{}, null)) |group| {
+        std.log.info("Test group: {s} {s} {s}", .{ group.name, group.pointsPolicy, group.feedbackPolicy });
+    }
 }
 
 fn readEnv(name: []const u8) []const u8 {

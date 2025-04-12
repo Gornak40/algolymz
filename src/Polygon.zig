@@ -58,43 +58,65 @@ pub const ProblemInfo = struct {
     memoryLimit: i32,
 };
 
+pub const TestGroup = struct {
+    name: []const u8,
+    pointsPolicy: []const u8,
+    feedbackPolicy: []const u8,
+    dependencies: [][]const u8,
+};
+
 pub const TestsetOption = struct {
     name: []const u8 = "tests",
 };
 
+/// Starts to build a new `Package`.
 pub fn problemBuildPackage(self: *Self, problemId: i32, full: bool, verify: bool) !void {
     const args = .{ .problemId = problemId, .full = full, .verify = verify };
     try sendApi(self, void, "problem.buildPackage", args);
 }
 
+/// Enable or disable test points for the problem.
 pub fn problemEnablePoints(self: *Self, problemId: i32, enable: bool) !void {
     const args = .{ .problemId = problemId, .enable = enable };
     try sendApi(self, void, "problem.enablePoints", args);
 }
 
+/// Enable or disable test groups for the specified testset.
 pub fn problemEnableGroups(self: *Self, problemId: i32, testset: TestsetOption, enable: bool) !void {
     const args = .{ .problemId = problemId, .enable = enable, .testset = testset.name };
     try sendApi(self, void, "problem.enableGroups", args);
 }
 
+/// Returns a `ProblemInfo` object.
 pub fn problemInfo(self: *Self, problemId: i32) !ProblemInfo {
     const args = .{ .problemId = problemId };
     return try sendApi(self, ProblemInfo, "problem.info", args);
 }
 
+/// Returns a list of `Package` objects - list all packages available for the problem
 pub fn problemPackages(self: *Self, problemId: i32) ![]Package {
     const args = .{ .problemId = problemId };
     return try sendApi(self, []Package, "problem.packages", args);
 }
 
+/// Returns problem general description.
 pub fn problemViewGeneralDescription(self: *Self, problemId: i32) ![]const u8 {
     const args = .{ .problemId = problemId };
     return try sendApi(self, []const u8, "problem.viewGeneralDescription", args);
 }
 
+/// Returns tags for the problem.
 pub fn problemViewTags(self: *Self, problemId: i32) ![][]const u8 {
     const args = .{ .problemId = problemId };
     return try sendApi(self, [][]const u8, "problem.viewTags", args);
+}
+
+/// Returns test groups for the specified testset.
+///
+/// Pass `null` to `group` to get all test groups.
+pub fn problemViewTestGroup(self: *Self, problemId: i32, testset: TestsetOption, group: ?[]const u8) ![]TestGroup {
+    const args = .{ .problemId = problemId, .testset = testset.name, .group = group };
+    return try sendApi(self, []TestGroup, "problem.viewTestGroup", args);
 }
 
 fn Result(comptime T: type) type {
@@ -181,13 +203,16 @@ fn sendApi(self: *Self, comptime T: type, api_method: []const u8, args: anytype)
     inline for (fields_info) |field| {
         const value = switch (@typeInfo(field.type)) {
             inline .Int, .Bool => try std.fmt.allocPrint(fba.allocator(), "{}", .{@field(args, field.name)}),
+            inline .Optional => @field(args, field.name) orelse "",
             else => @field(args, field.name),
         };
-        const param = ApiParam{
-            .name = field.name,
-            .value = value,
-        };
-        try params.append(param);
+        if (value.len != 0) { // TODO: find more ideomatic solution.
+            const param = ApiParam{
+                .name = field.name,
+                .value = value,
+            };
+            try params.append(param);
+        }
     }
 
     const sign = try apiParamSig(self, api_method, params.items);
