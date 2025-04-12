@@ -15,8 +15,15 @@ pub fn main() !void {
     });
     defer cli.deinit();
 
-    const info = try cli.problemInfo("427411");
-    std.log.info("Time limit: {}", .{info.timeLimit});
+    const id = 427411;
+    std.log.info("Time limit: {}", .{(try cli.problemInfo(id)).timeLimit});
+    for (try cli.problemViewTags(id)) |tag| {
+        std.log.info("Problem tag: {s}", .{tag});
+    }
+    std.log.info("Description: {s}", .{try cli.problemViewGeneralDescription(id)});
+    for (try cli.problemPackages(id)) |package| {
+        std.log.info("Problem package: {} {} {s}", .{ package.id, package.revision, package.type });
+    }
 }
 
 fn readEnv(name: []const u8) []const u8 {

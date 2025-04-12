@@ -29,6 +29,27 @@ pub fn deinit(self: *Self) void {
     self.client.deinit();
 }
 
+pub const Package = struct {
+    id: i32,
+    revision: i32,
+    creationTimeSeconds: i32,
+    state: []const u8,
+    comment: []const u8,
+    type: []const u8,
+};
+
+pub const Problem = struct {
+    id: i32,
+    owner: []const u8,
+    name: []const u8,
+    deleted: bool,
+    favourite: bool,
+    accessType: []const u8,
+    revision: i32,
+    latestPackage: ?i32 = null,
+    modified: bool,
+};
+
 pub const ProblemInfo = struct {
     inputFile: []const u8,
     outputFile: []const u8,
@@ -37,9 +58,24 @@ pub const ProblemInfo = struct {
     memoryLimit: i32,
 };
 
-pub fn problemInfo(self: *Self, problemId: []const u8) !ProblemInfo {
+pub fn problemInfo(self: *Self, problemId: i32) !ProblemInfo {
     const args = .{ .problemId = problemId };
     return try sendApi(self, ProblemInfo, "problem.info", args);
+}
+
+pub fn problemPackages(self: *Self, problemId: i32) ![]Package {
+    const args = .{ .problemId = problemId };
+    return try sendApi(self, []Package, "problem.packages", args);
+}
+
+pub fn problemViewGeneralDescription(self: *Self, problemId: i32) ![]const u8 {
+    const args = .{ .problemId = problemId };
+    return try sendApi(self, []const u8, "problem.viewGeneralDescription", args);
+}
+
+pub fn problemViewTags(self: *Self, problemId: i32) ![][]const u8 {
+    const args = .{ .problemId = problemId };
+    return try sendApi(self, [][]const u8, "problem.viewTags", args);
 }
 
 fn Result(comptime T: type) type {
@@ -121,10 +157,16 @@ fn sendApi(self: *Self, comptime T: type, api_method: []const u8, args: anytype)
     try params.append(.{ .name = "time", .value = time });
 
     const fields_info = args_type_info.Struct.fields;
+    var buf: [1024]u8 = undefined;
+    var fba = std.heap.FixedBufferAllocator.init(&buf);
     inline for (fields_info) |field| {
+        const value = switch (@typeInfo(field.type)) {
+            .Int => try std.fmt.allocPrint(fba.allocator(), "{}", .{@field(args, field.name)}),
+            else => @field(args, field.name),
+        };
         const param = ApiParam{
             .name = field.name,
-            .value = @field(args, field.name),
+            .value = value,
         };
         try params.append(param);
     }
