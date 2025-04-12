@@ -58,6 +58,25 @@ pub const ProblemInfo = struct {
     memoryLimit: i32,
 };
 
+pub const TestsetOption = struct {
+    name: []const u8 = "tests",
+};
+
+pub fn problemBuildPackage(self: *Self, problemId: i32, full: bool, verify: bool) !void {
+    const args = .{ .problemId = problemId, .full = full, .verify = verify };
+    try sendApi(self, void, "problem.buildPackage", args);
+}
+
+pub fn problemEnablePoints(self: *Self, problemId: i32, enable: bool) !void {
+    const args = .{ .problemId = problemId, .enable = enable };
+    try sendApi(self, void, "problem.enablePoints", args);
+}
+
+pub fn problemEnableGroups(self: *Self, problemId: i32, testset: TestsetOption, enable: bool) !void {
+    const args = .{ .problemId = problemId, .enable = enable, .testset = testset.name };
+    try sendApi(self, void, "problem.enableGroups", args);
+}
+
 pub fn problemInfo(self: *Self, problemId: i32) !ProblemInfo {
     const args = .{ .problemId = problemId };
     return try sendApi(self, ProblemInfo, "problem.info", args);
@@ -82,7 +101,7 @@ fn Result(comptime T: type) type {
     return struct {
         status: []const u8,
         comment: ?[]const u8 = null,
-        result: ?T = null,
+        result: if (T == void) ?struct {} else ?T = null,
     };
 }
 
@@ -161,7 +180,7 @@ fn sendApi(self: *Self, comptime T: type, api_method: []const u8, args: anytype)
     var fba = std.heap.FixedBufferAllocator.init(&buf);
     inline for (fields_info) |field| {
         const value = switch (@typeInfo(field.type)) {
-            .Int => try std.fmt.allocPrint(fba.allocator(), "{}", .{@field(args, field.name)}),
+            inline .Int, .Bool => try std.fmt.allocPrint(fba.allocator(), "{}", .{@field(args, field.name)}),
             else => @field(args, field.name),
         };
         const param = ApiParam{
@@ -187,7 +206,7 @@ fn sendApi(self: *Self, comptime T: type, api_method: []const u8, args: anytype)
     if (std.mem.eql(u8, result.status, "FAILED")) {
         return error.PolygonRequestFailed;
     }
-    return result.result.?;
+    return if (T == void) {} else result.result.?;
 }
 
 fn sendRaw(self: *Self, url: []const u8, body: []const u8) ![]const u8 {

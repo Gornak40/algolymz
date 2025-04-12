@@ -24,6 +24,12 @@ pub fn main() !void {
     for (try cli.problemPackages(id)) |package| {
         std.log.info("Problem package: {} {} {s}", .{ package.id, package.revision, package.type });
     }
+    std.log.info("Build full package with verify", .{});
+    cli.problemBuildPackage(id, true, true) catch |err| {
+        std.log.err("{}", .{err});
+    };
+    try cli.problemEnableGroups(id, .{}, true);
+    try cli.problemEnablePoints(id, true);
 }
 
 fn readEnv(name: []const u8) []const u8 {
