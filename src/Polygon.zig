@@ -29,6 +29,39 @@ pub fn deinit(self: *Self) void {
     self.client.deinit();
 }
 
+pub const File = struct {
+    name: []const u8,
+    modificationTimeSeconds: i32,
+    length: usize,
+    sourceType: ?[]const u8 = null,
+    resourceAdvancedProperties: ?ResourceAdvancedProperties = null,
+
+    pub const ResourceAdvancedProperties = struct {
+        forTypes: []const u8,
+        main: bool,
+        stages: []Stage,
+        assets: []Asset,
+
+        pub const Stage = enum {
+            COMPILE,
+            RUN,
+        };
+
+        pub const Asset = enum {
+            VALIDATOR,
+            INTERACTOR,
+            CHECKER,
+            SOLUTION,
+        };
+    };
+};
+
+pub const Files = struct {
+    resourceFiles: []File,
+    sourceFiles: []File,
+    auxFiles: []File,
+};
+
 pub const Package = struct {
     id: i32,
     revision: i32,
@@ -148,6 +181,14 @@ pub fn problemEnablePoints(self: *Self, problemId: i32, enable: bool) !void {
 pub fn problemEnableGroups(self: *Self, problemId: i32, enable: bool, testset: TestsetOption) !void {
     const args = .{ .problemId = problemId, .enable = enable, .testset = testset.name };
     try sendApi(self, void, "problem.enableGroups", args);
+}
+
+/// Returns the list of resource, source and aux files.
+/// Method returns a JSON object with three fields:
+/// resourceFiles, sourceFiles and auxFiles, each of them is a list of `File` objects.
+pub fn problemFiles(self: *Self, problemId: i32) !Files {
+    const args = .{ .problemId = problemId };
+    return try sendApi(self, Files, "problem.files", args);
 }
 
 /// Returns a `ProblemInfo` object.

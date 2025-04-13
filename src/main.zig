@@ -46,6 +46,7 @@ pub fn main() !void {
     try cli.problemSaveScript(pid, "gen 123 > 2\ngen > 3", .{});
     const st = try cli.problemStatements(pid);
     std.log.info("Problem name: {s}", .{st.map.get("russian").?.name});
+    std.log.info("Problem source files: {}", .{(try cli.problemFiles(pid)).sourceFiles.len});
 }
 
 fn readEnv(name: []const u8) []const u8 {
