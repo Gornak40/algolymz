@@ -145,6 +145,12 @@ pub fn problemPackages(self: *Self, problemId: i32) ![]Package {
     return try sendApi(self, []Package, "problem.packages", args);
 }
 
+/// Add or edit test. In case of editing, all parameters except for testset and testIndex are optional.
+pub fn problemSaveScript(self: *Self, problemId: i32, source: []const u8, testset: TestsetOption) !void {
+    const args = .{ .problemId = problemId, .source = source, .testset = testset.name };
+    try sendApi(self, void, "problem.saveScript", args);
+}
+
 /// Returns tests for the given testset.
 pub fn problemTests(self: *Self, problemId: i32, noInputs: bool, testset: TestsetOption) ![]Test {
     const args = .{ .problemId = problemId, .noInputs = noInputs, .testset = testset.name };
@@ -155,6 +161,12 @@ pub fn problemTests(self: *Self, problemId: i32, noInputs: bool, testset: Testse
 pub fn problemViewGeneralDescription(self: *Self, problemId: i32) ![]const u8 {
     const args = .{ .problemId = problemId };
     return try sendApi(self, []const u8, "problem.viewGeneralDescription", args);
+}
+
+/// Returns problem general tutorial.
+pub fn problemViewGeneralTutorial(self: *Self, problemId: i32) ![]const u8 {
+    const args = .{ .problemId = problemId };
+    return try sendApi(self, []const u8, "problem.viewGeneralTutorial", args);
 }
 
 /// Returns tags for the problem.

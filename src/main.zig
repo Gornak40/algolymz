@@ -21,6 +21,7 @@ pub fn main() !void {
         std.log.info("Problem tag: {s}", .{tag});
     }
     std.log.info("Description: {s}", .{try cli.problemViewGeneralDescription(id)});
+    std.log.info("Tutorial: {s}", .{try cli.problemViewGeneralTutorial(id)});
     for (try cli.problemPackages(id)) |package| {
         std.log.info("Problem package: {} {} {}", .{ package.id, package.revision, @intFromEnum(package.type) });
     }
@@ -34,6 +35,8 @@ pub fn main() !void {
         std.log.info("Test group: {s} {} {}", .{ group.name, @intFromEnum(group.pointsPolicy), @intFromEnum(group.feedbackPolicy) });
     }
     std.log.info("Tests count: {}", .{(try cli.problemTests(id, false, .{})).len});
+    std.log.info("Save script", .{});
+    try cli.problemSaveScript(id, "gen 123 > 2\ngen > 3", .{});
 }
 
 fn readEnv(name: []const u8) []const u8 {
