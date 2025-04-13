@@ -77,6 +77,21 @@ pub const ProblemInfo = struct {
     memoryLimit: i32,
 };
 
+pub const Test = struct {
+    index: i32,
+    manual: bool,
+    input: ?[]const u8 = null,
+    inputBase64: ?[]const u8 = null,
+    description: ?[]const u8 = null,
+    useInStatements: bool,
+    scriptLine: ?[]const u8 = null,
+    group: ?[]const u8 = null,
+    points: ?f64 = null,
+    inputForStatement: ?[]const u8 = null,
+    outputForStatement: ?[]const u8 = null,
+    verifyInputOutputForStatements: ?bool = null,
+};
+
 pub const TestGroup = struct {
     name: []const u8,
     pointsPolicy: PointsPolicy,
@@ -128,6 +143,12 @@ pub fn problemInfo(self: *Self, problemId: i32) !ProblemInfo {
 pub fn problemPackages(self: *Self, problemId: i32) ![]Package {
     const args = .{ .problemId = problemId };
     return try sendApi(self, []Package, "problem.packages", args);
+}
+
+/// Returns tests for the given testset.
+pub fn problemTests(self: *Self, problemId: i32, noInputs: bool, testset: TestsetOption) ![]Test {
+    const args = .{ .problemId = problemId, .noInputs = noInputs, .testset = testset.name };
+    return try sendApi(self, []Test, "problem.tests", args);
 }
 
 /// Returns problem general description.
@@ -283,8 +304,8 @@ fn sendRaw(self: *Self, url: []const u8, body: []const u8) ![]const u8 {
     try req.wait();
 
     std.log.info("Response status: {}", .{@intFromEnum(req.response.status)});
-    var resp_list = try std.ArrayList(u8).initCapacity(self.alloc, 4096);
+    var resp_list = try std.ArrayList(u8).initCapacity(self.alloc, 1024);
     errdefer resp_list.deinit();
-    try req.reader().readAllArrayList(&resp_list, 4096);
+    try req.reader().readAllArrayList(&resp_list, std.math.maxInt(usize));
     return resp_list.toOwnedSlice();
 }

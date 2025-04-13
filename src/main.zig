@@ -33,6 +33,7 @@ pub fn main() !void {
     for (try cli.problemViewTestGroup(id, null, .{})) |group| {
         std.log.info("Test group: {s} {} {}", .{ group.name, @intFromEnum(group.pointsPolicy), @intFromEnum(group.feedbackPolicy) });
     }
+    std.log.info("Tests count: {}", .{(try cli.problemTests(id, false, .{})).len});
 }
 
 fn readEnv(name: []const u8) []const u8 {
