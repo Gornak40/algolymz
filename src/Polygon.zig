@@ -110,6 +110,14 @@ pub const ProblemInfo = struct {
     memoryLimit: i32,
 };
 
+pub const Solution = struct {
+    name: []const u8,
+    modificationTimeSeconds: i32,
+    length: usize,
+    sourceType: []const u8,
+    tag: []const u8,
+};
+
 pub const Statement = struct {
     encoding: []const u8,
     name: []const u8,
@@ -207,6 +215,12 @@ pub fn problemPackages(self: *Self, problemId: i32) ![]Package {
 pub fn problemSaveScript(self: *Self, problemId: i32, source: []const u8, testset: TestsetOption) !void {
     const args = .{ .problemId = problemId, .source = source, .testset = testset.name };
     try sendApi(self, void, "problem.saveScript", args);
+}
+
+/// Returns the list of `Solution` objects.
+pub fn problemSolutions(self: *Self, problemId: i32) ![]Solution {
+    const args = .{ .problemId = problemId };
+    return try sendApi(self, []Solution, "problem.solutions", args);
 }
 
 /// Returns a map from language to a `Statement` object for that language.

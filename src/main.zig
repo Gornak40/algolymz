@@ -47,6 +47,9 @@ pub fn main() !void {
     const st = try cli.problemStatements(pid);
     std.log.info("Problem name: {s}", .{st.map.get("russian").?.name});
     std.log.info("Problem source files: {}", .{(try cli.problemFiles(pid)).sourceFiles.len});
+    for (try cli.problemSolutions(pid)) |sol| {
+        std.log.info("Problem solution: {s}", .{sol.name});
+    }
 }
 
 fn readEnv(name: []const u8) []const u8 {
