@@ -57,7 +57,7 @@ pub const Problem = struct {
     name: []const u8,
     deleted: bool,
     favourite: bool,
-    accessType: AccessType,
+    accessType: ?AccessType = null,
     revision: i32,
     latestPackage: ?i32 = null,
     modified: bool,
@@ -75,6 +75,18 @@ pub const ProblemInfo = struct {
     interactive: bool,
     timeLimit: i32,
     memoryLimit: i32,
+};
+
+pub const Statement = struct {
+    encoding: []const u8,
+    name: []const u8,
+    legend: []const u8,
+    input: []const u8,
+    output: []const u8,
+    scoring: ?[]const u8 = null,
+    interaction: ?[]const u8 = null,
+    notes: []const u8,
+    tutorial: []const u8,
 };
 
 pub const Test = struct {
@@ -115,6 +127,11 @@ pub const TestsetOption = struct {
     name: []const u8 = "tests",
 };
 
+pub fn contestProblems(self: *Self, contestId: i32) !std.json.ArrayHashMap(Problem) {
+    const args = .{ .contestId = contestId };
+    return try sendApi(self, std.json.ArrayHashMap(Problem), "contest.problems", args);
+}
+
 /// Starts to build a new `Package`.
 pub fn problemBuildPackage(self: *Self, problemId: i32, full: bool, verify: bool) !void {
     const args = .{ .problemId = problemId, .full = full, .verify = verify };
@@ -149,6 +166,12 @@ pub fn problemPackages(self: *Self, problemId: i32) ![]Package {
 pub fn problemSaveScript(self: *Self, problemId: i32, source: []const u8, testset: TestsetOption) !void {
     const args = .{ .problemId = problemId, .source = source, .testset = testset.name };
     try sendApi(self, void, "problem.saveScript", args);
+}
+
+/// Returns a map from language to a `Statement` object for that language.
+pub fn problemStatements(self: *Self, problemId: i32) !std.json.ArrayHashMap(Statement) {
+    const args = .{ .problemId = problemId };
+    return try sendApi(self, std.json.ArrayHashMap(Statement), "problem.statements", args);
 }
 
 /// Returns tests for the given testset.
