@@ -268,6 +268,12 @@ pub fn problemSetValidator(self: *Self, problemId: i32, validator: []const u8) !
     try sendApi(self, void, "problem.setValidator", args);
 }
 
+/// Update interactor.
+pub fn problemSetInteractor(self: *Self, problemId: i32, interactor: []const u8) !void {
+    const args = .{ .problemId = problemId, .interactor = interactor };
+    try sendApi(self, void, "problem.setInteractor", args);
+}
+
 /// Returns the list of `Solution` objects.
 pub fn problemSolutions(self: *Self, problemId: i32) ![]Solution {
     const args = .{ .problemId = problemId };
@@ -284,6 +290,26 @@ pub fn problemStatements(self: *Self, problemId: i32) !std.json.ArrayHashMap(Sta
 pub fn problemTests(self: *Self, problemId: i32, noInputs: bool, testset: TestsetOption) ![]Test {
     const args = .{ .problemId = problemId, .noInputs = noInputs, .testset = testset.name };
     return try sendApi(self, []Test, "problem.tests", args);
+}
+
+pub const ProblemUpdateInfoOptions = struct {
+    problemId: i32,
+    inputFile: ?[]const u8 = null,
+    outputFile: ?[]const u8 = null,
+    interactive: ?bool = null,
+    timeLimit: ?i32 = null,
+    memoryLimit: ?i32 = null,
+};
+
+/// Update problem info. All parameters are optional.
+pub fn problemUpdateInfo(self: *Self, opts: ProblemUpdateInfoOptions) !void {
+    try sendApi(self, void, "problem.updateInfo", opts);
+}
+
+/// Updates working copy.
+pub fn problemUpdateWorkingCopy(self: *Self, problemId: i32) !void {
+    const args = .{ .problemId = problemId };
+    try sendApi(self, void, "problem.updateWorkingCopy", args);
 }
 
 /// Returns problem general description.

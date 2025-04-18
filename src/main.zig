@@ -23,6 +23,8 @@ pub fn main() !void {
     }
 
     const pid = 427411;
+    std.log.info("Update working copy", .{});
+    try cli.problemUpdateWorkingCopy(pid);
     std.log.info("Time limit: {}", .{(try cli.problemInfo(pid)).timeLimit});
     for (try cli.problemViewTags(pid)) |tag| {
         std.log.info("Problem tag: {s}", .{tag});
@@ -68,6 +70,10 @@ pub fn main() !void {
     try cli.problemSetChecker(pid, "std::lcmp.cpp");
     std.log.info("Problem set validator", .{});
     try cli.problemSetValidator(pid, "val.cpp");
+    std.log.info("Make problem interactive", .{});
+    try cli.problemUpdateInfo(.{ .problemId = pid, .interactive = true });
+    std.log.info("Problem set interactor", .{});
+    try cli.problemSetInteractor(pid, "val.cpp");
 }
 
 fn readEnv(name: []const u8) []const u8 {
