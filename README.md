@@ -1,2 +1,5 @@
 # algolymz
-Epic tools for Polygon written in Zig.
+
+*Zig client for [Codeforces Polygon](https://polygon.codeforces.com).*
+
+Inspired by [algolymp](https://github.com/Gornak40/algolymp).
