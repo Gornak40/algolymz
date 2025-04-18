@@ -50,6 +50,13 @@ pub fn main() !void {
     for (try cli.problemSolutions(pid)) |sol| {
         std.log.info("Problem solution: {s}", .{sol.name});
     }
+    std.log.info("Problem save solution", .{});
+    try cli.problemSaveSolution(.{
+        .problemId = pid,
+        .name = "algolymz.py",
+        .file = "print('Hello')",
+        .tag = .WA,
+    });
 }
 
 fn readEnv(name: []const u8) []const u8 {

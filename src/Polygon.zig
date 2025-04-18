@@ -220,11 +220,12 @@ pub fn problemSaveScript(self: *Self, problemId: i32, source: []const u8, testse
 }
 
 pub const ProblemSaveSolutionOptions = struct {
+    problemId: i32,
     checkExisting: ?bool = null,
     name: []const u8,
     file: ?[]const u8 = null,
     sourceType: ?[]const u8 = null,
-    tag: ?Problem.Tag = null,
+    tag: ?Solution.Tag = null,
 };
 
 /// Add or edit solution. In case of editing, all parameters except for name are optional.
@@ -337,6 +338,15 @@ fn apiParamSig(self: *Self, api_method: []const u8, params: []ApiParam) ![sig_le
     return sign;
 }
 
+fn reflectType(alloc: std.mem.Allocator, value: anytype) !?[]const u8 {
+    return switch (@typeInfo(@TypeOf(value))) {
+        inline .Int, .Bool => try std.fmt.allocPrint(alloc, "{}", .{value}),
+        inline .Optional => if (value) |v| try reflectType(alloc, v) else null,
+        inline .Enum => @tagName(value),
+        else => value,
+    };
+}
+
 fn sendApi(self: *Self, comptime T: type, api_method: []const u8, args: anytype) !T {
     std.log.info("Invoke {s} request", .{api_method});
 
@@ -361,17 +371,11 @@ fn sendApi(self: *Self, comptime T: type, api_method: []const u8, args: anytype)
     var buf: [1024]u8 = undefined;
     var fba = std.heap.FixedBufferAllocator.init(&buf);
     inline for (fields_info) |field| {
-        const f = @field(args, field.name);
-        const value = switch (@typeInfo(field.type)) {
-            inline .Int, .Bool => try std.fmt.allocPrint(fba.allocator(), "{}", .{f}),
-            inline .Optional => f orelse "",
-            inline .Enum => @tagName(f),
-            else => f,
-        };
-        if (value.len != 0) { // TODO: find more ideomatic solution.
+        const value = try reflectType(fba.allocator(), @field(args, field.name));
+        if (value) |value_str| {
             const param = ApiParam{
                 .name = field.name,
-                .value = value,
+                .value = value_str,
             };
             try params.append(param);
         }
