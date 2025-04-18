@@ -1,3 +1,5 @@
+// Copyright (C) 2025 Alexander Gornak <s-kozelsk@yandex.ru>
+
 const std = @import("std");
 const Sha512 = std.crypto.hash.sha2.Sha512;
 
@@ -360,7 +362,8 @@ fn apiParamSig(self: *Self, api_method: []const u8, params: []ApiParam) ![sig_le
 
 fn reflectType(alloc: std.mem.Allocator, value: anytype) !?[]const u8 {
     return switch (@typeInfo(@TypeOf(value))) {
-        inline .Int, .Bool, .Float => try std.fmt.allocPrint(alloc, "{}", .{value}),
+        inline .Int, .Bool => try std.fmt.allocPrint(alloc, "{}", .{value}),
+        inline .Float => try std.fmt.allocPrint(alloc, "{d}", .{value}),
         inline .Optional => if (value) |v| try reflectType(alloc, v) else null,
         inline .Enum => @tagName(value),
         else => value,

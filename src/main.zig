@@ -62,6 +62,7 @@ pub fn main() !void {
         .problemId = pid,
         .testIndex = 1,
         .testInput = "1\n2\n3",
+        .testPoints = 2,
     });
 }
 
