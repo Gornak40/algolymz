@@ -115,7 +115,9 @@ pub const Solution = struct {
     modificationTimeSeconds: i32,
     length: usize,
     sourceType: []const u8,
-    tag: []const u8,
+    tag: Tag,
+
+    pub const Tag = enum { MA, OK, RJ, TL, TO, WA, PE, ML, RE };
 };
 
 pub const Statement = struct {
@@ -215,6 +217,19 @@ pub fn problemPackages(self: *Self, problemId: i32) ![]Package {
 pub fn problemSaveScript(self: *Self, problemId: i32, source: []const u8, testset: TestsetOption) !void {
     const args = .{ .problemId = problemId, .source = source, .testset = testset.name };
     try sendApi(self, void, "problem.saveScript", args);
+}
+
+pub const ProblemSaveSolutionOptions = struct {
+    checkExisting: ?bool = null,
+    name: []const u8,
+    file: ?[]const u8 = null,
+    sourceType: ?[]const u8 = null,
+    tag: ?Problem.Tag = null,
+};
+
+/// Add or edit solution. In case of editing, all parameters except for name are optional.
+pub fn problemSaveSolution(self: *Self, opts: ProblemSaveSolutionOptions) !void {
+    try sendApi(self, void, "problem.saveSolution", opts);
 }
 
 /// Returns the list of `Solution` objects.
@@ -346,10 +361,12 @@ fn sendApi(self: *Self, comptime T: type, api_method: []const u8, args: anytype)
     var buf: [1024]u8 = undefined;
     var fba = std.heap.FixedBufferAllocator.init(&buf);
     inline for (fields_info) |field| {
+        const f = @field(args, field.name);
         const value = switch (@typeInfo(field.type)) {
-            inline .Int, .Bool => try std.fmt.allocPrint(fba.allocator(), "{}", .{@field(args, field.name)}),
-            inline .Optional => @field(args, field.name) orelse "",
-            else => @field(args, field.name),
+            inline .Int, .Bool => try std.fmt.allocPrint(fba.allocator(), "{}", .{f}),
+            inline .Optional => f orelse "",
+            inline .Enum => @tagName(f),
+            else => f,
         };
         if (value.len != 0) { // TODO: find more ideomatic solution.
             const param = ApiParam{
