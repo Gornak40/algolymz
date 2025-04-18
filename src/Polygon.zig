@@ -172,6 +172,7 @@ pub const TestsetOption = struct {
     name: []const u8 = "tests",
 };
 
+/// Returns a list of `Problem` objects - problems of the contest.
 pub fn contestProblems(self: *Self, contestId: i32) !std.json.ArrayHashMap(Problem) {
     const args = .{ .contestId = contestId };
     return try sendApi(self, std.json.ArrayHashMap(Problem), "contest.problems", args);
@@ -253,6 +254,18 @@ pub const ProblemSaveTestOptions = struct {
 /// Add or edit test. In case of editing, all parameters except for testset and testIndex are optional.
 pub fn problemSaveTest(self: *Self, opts: ProblemSaveTestOptions) !void {
     try sendApi(self, void, "problem.saveTest", opts);
+}
+
+/// Update checker.
+pub fn problemSetChecker(self: *Self, problemId: i32, checker: []const u8) !void {
+    const args = .{ .problemId = problemId, .checker = checker };
+    try sendApi(self, void, "problem.setChecker", args);
+}
+
+/// Update validator.
+pub fn problemSetValidator(self: *Self, problemId: i32, validator: []const u8) !void {
+    const args = .{ .problemId = problemId, .validator = validator };
+    try sendApi(self, void, "problem.setValidator", args);
 }
 
 /// Returns the list of `Solution` objects.

@@ -64,6 +64,10 @@ pub fn main() !void {
         .testInput = "1\n2\n3",
         .testPoints = 2,
     });
+    std.log.info("Problem set checker", .{});
+    try cli.problemSetChecker(pid, "std::lcmp.cpp");
+    std.log.info("Problem set validator", .{});
+    try cli.problemSetValidator(pid, "val.cpp");
 }
 
 fn readEnv(name: []const u8) []const u8 {
