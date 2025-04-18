@@ -233,6 +233,26 @@ pub fn problemSaveSolution(self: *Self, opts: ProblemSaveSolutionOptions) !void 
     try sendApi(self, void, "problem.saveSolution", opts);
 }
 
+pub const ProblemSaveTestOptions = struct {
+    problemId: i32,
+    checkExisting: ?bool = null,
+    testset: []const u8 = (TestsetOption{}).name,
+    testIndex: i32,
+    testInput: ?[]const u8 = null,
+    testGroup: ?[]const u8 = null,
+    testPoints: ?f64 = null,
+    testDescription: ?[]const u8 = null,
+    testUseInStatements: ?bool = null,
+    testInputForStatements: ?[]const u8 = null,
+    testOutputForStatements: ?[]const u8 = null,
+    verifyInputOutputForStatements: ?bool = null,
+};
+
+/// Add or edit test. In case of editing, all parameters except for testset and testIndex are optional.
+pub fn problemSaveTest(self: *Self, opts: ProblemSaveTestOptions) !void {
+    try sendApi(self, void, "problem.saveTest", opts);
+}
+
 /// Returns the list of `Solution` objects.
 pub fn problemSolutions(self: *Self, problemId: i32) ![]Solution {
     const args = .{ .problemId = problemId };
@@ -340,7 +360,7 @@ fn apiParamSig(self: *Self, api_method: []const u8, params: []ApiParam) ![sig_le
 
 fn reflectType(alloc: std.mem.Allocator, value: anytype) !?[]const u8 {
     return switch (@typeInfo(@TypeOf(value))) {
-        inline .Int, .Bool => try std.fmt.allocPrint(alloc, "{}", .{value}),
+        inline .Int, .Bool, .Float => try std.fmt.allocPrint(alloc, "{}", .{value}),
         inline .Optional => if (value) |v| try reflectType(alloc, v) else null,
         inline .Enum => @tagName(value),
         else => value,

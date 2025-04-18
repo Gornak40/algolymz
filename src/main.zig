@@ -57,6 +57,12 @@ pub fn main() !void {
         .file = "print('Hello')",
         .tag = .WA,
     });
+    std.log.info("Problem save test", .{});
+    try cli.problemSaveTest(.{
+        .problemId = pid,
+        .testIndex = 1,
+        .testInput = "1\n2\n3",
+    });
 }
 
 fn readEnv(name: []const u8) []const u8 {
