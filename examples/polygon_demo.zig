@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const Polygon = @import("Polygon.zig");
+const Polygon = @import("algolymz").Polygon;
 
 pub fn main() !void {
     var heap = std.heap.GeneralPurposeAllocator(.{}){};
