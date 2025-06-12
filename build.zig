@@ -8,6 +8,15 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/root.zig"),
     });
 
+    const unit_tests = b.addTest(.{
+        .root_source_file = b.path("src/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const unit_tests_step = b.step("test", "Run all unit tests");
+    const run_unit_tests_cmd = b.addRunArtifact(unit_tests);
+    unit_tests_step.dependOn(&run_unit_tests_cmd.step);
+
     const polygon_demo_exe = b.addExecutable(.{
         .name = "polygon_demo",
         .root_source_file = b.path("examples/polygon_demo.zig"),
