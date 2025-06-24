@@ -111,23 +111,25 @@ const InnerPattern = union(enum) {
 };
 
 pub const Parser = struct {
+    base_alloc: std.mem.Allocator,
     arena: *std.heap.ArenaAllocator,
-    alloc: std.mem.Allocator,
     data: std.StringHashMap(Collection),
 
     const Collection = std.StringArrayHashMap([]const InnerPattern);
 
-    pub fn init(arena: *std.heap.ArenaAllocator) Parser {
-        const alloc = arena.allocator();
+    pub fn init(base_alloc: std.mem.Allocator) !Parser {
+        var arena = try base_alloc.create(std.heap.ArenaAllocator);
+        arena.* = std.heap.ArenaAllocator.init(base_alloc);
         return .{
+            .base_alloc = base_alloc,
             .arena = arena,
-            .alloc = alloc,
-            .data = std.StringHashMap(Collection).init(alloc),
+            .data = std.StringHashMap(Collection).init(arena.allocator()),
         };
     }
 
     pub fn deinit(self: *Parser) void {
         self.arena.deinit();
+        self.base_alloc.destroy(self.arena);
     }
 
     pub fn feed(self: *Parser, s: []const u8) !void {
@@ -178,8 +180,7 @@ test "parse from slice" {
         \\flag_on
         \\$aboba = aboba::aboltus
     ;
-    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
-    var p = Parser.init(&arena);
+    var p = try Parser.init(std.testing.allocator);
     defer p.deinit();
     _ = try p.feed(config);
 }
