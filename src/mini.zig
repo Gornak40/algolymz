@@ -110,18 +110,59 @@ const InnerPattern = union(enum) {
     }
 };
 
-fn innerParse(_: std.mem.Allocator, s: []const u8) !void {
-    var iter = std.mem.splitScalar(u8, s, '\n');
-    while (iter.next()) |line| {
-        const p = try InnerPattern.match(line);
-        std.debug.print("TAG {s}: {s}\n", .{ line, @tagName(p) });
-    }
-}
+pub const Parser = struct {
+    arena: *std.heap.ArenaAllocator,
+    alloc: std.mem.Allocator,
+    data: std.StringHashMap(Collection),
 
-pub fn parseFromSlice(comptime T: type, alloc: std.mem.Allocator, s: []const u8) !T {
-    try innerParse(alloc, s);
-    return .{};
-}
+    const Collection = std.StringArrayHashMap([]const InnerPattern);
+
+    pub fn init(arena: *std.heap.ArenaAllocator) Parser {
+        const alloc = arena.allocator();
+        return .{
+            .arena = arena,
+            .alloc = alloc,
+            .data = std.StringHashMap(Collection).init(alloc),
+        };
+    }
+
+    pub fn deinit(self: *Parser) void {
+        self.arena.deinit();
+    }
+
+    pub fn feed(self: *Parser, s: []const u8) !void {
+        var header: ?struct { []const u8, []const u8 } = null;
+        var fields = std.ArrayList(InnerPattern).init(self.arena.allocator());
+        var iter = std.mem.splitScalar(u8, s, '\n');
+        while (iter.next()) |line| {
+            const p = try InnerPattern.match(line);
+            std.debug.print("TAG {s}: {s}\n", .{ line, @tagName(p) });
+            switch (p) {
+                .header => |cur_header| {
+                    if (header) |prev_header| {
+                        try self.appendField(prev_header, try fields.toOwnedSlice());
+                    }
+                    header = cur_header;
+                },
+                .simple, .flag, .anchor => {
+                    if (header) |_| try fields.append(p) else return error.MissingHeader;
+                },
+                .empty => continue,
+            }
+        } else if (header) |cur_header| {
+            try self.appendField(cur_header, try fields.toOwnedSlice());
+        }
+    }
+
+    fn appendField(self: *Parser, header: struct { []const u8, []const u8 }, fields: []const InnerPattern) !void {
+        var entry = try self.data.getOrPut(header[0]);
+        if (!entry.found_existing) {
+            entry.value_ptr.* = Collection.init(self.arena.allocator());
+        }
+        const res = try entry.value_ptr.getOrPutValue(header[1], fields);
+        if (res.found_existing) return error.DuplicateName;
+    }
+};
 
 test "parse from slice" {
     const config =
@@ -137,5 +178,8 @@ test "parse from slice" {
         \\flag_on
         \\$aboba = aboba::aboltus
     ;
-    _ = try parseFromSlice(struct {}, std.testing.allocator, config);
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    var p = Parser.init(&arena);
+    defer p.deinit();
+    _ = try p.feed(config);
 }
