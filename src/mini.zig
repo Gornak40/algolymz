@@ -17,6 +17,10 @@ const InnerPattern = union(enum) {
         @"=",
         identifier,
         value,
+
+        fn hasMeta(self: Token) bool {
+            return self == .identifier or self == .value;
+        }
     };
 
     fn getPattern(self: Enum) []const Token {
@@ -29,27 +33,21 @@ const InnerPattern = union(enum) {
         };
     }
 
-    var buffer: [256]u8 = undefined;
-
     pub fn match(s: []const u8) !InnerPattern {
-        var fba = std.heap.FixedBufferAllocator.init(&buffer);
         inline for (std.meta.fields(Enum)) |f| {
             const field = @field(Enum, f.name);
             const pattern = comptime getPattern(field);
             comptime var cap = 0;
             inline for (pattern) |token| {
-                if (token == .identifier or token == .value)
-                    cap += 1;
+                if (comptime token.hasMeta()) cap += 1;
             }
-            var buf = std.ArrayList([]const u8).initCapacity(fba.allocator(), cap) catch unreachable;
+            var buf: [cap][]const u8 = undefined;
             if (matchOne(s, pattern, &buf)) {
                 var meta: std.meta.Tuple(&[_]type{[]const u8} ** cap) = undefined;
-                inline for (0..cap) |i| {
-                    meta[i] = buf.items[i];
-                }
+                inline for (0..cap) |i|
+                    meta[i] = buf[i];
                 return @unionInit(InnerPattern, f.name, meta);
             }
-            fba.reset();
         }
         return error.InvalidPattern;
     }
@@ -67,8 +65,9 @@ const InnerPattern = union(enum) {
         return std.ascii.isLower(c) or c == '_';
     }
 
-    fn matchOne(s: []const u8, pattern: []const Token, buf: *std.ArrayList([]const u8)) bool {
+    fn matchOne(s: []const u8, pattern: []const Token, buf: [][]const u8) bool {
         var i: usize = 0;
+        var buf_i: usize = 0;
         for (pattern) |token| {
             while (i < s.len and std.ascii.isWhitespace(s[i])) : (i += 1) {}
             if (i >= s.len or s[i] == '#') return false;
@@ -96,14 +95,14 @@ const InnerPattern = union(enum) {
                 .identifier => {
                     const start = i;
                     while (i < s.len and isIdentifierChar(s[i])) : (i += 1) {}
-                    const str = s[start..i];
-                    buf.appendAssumeCapacity(str);
+                    buf[buf_i] = s[start..i];
+                    buf_i += 1;
                 },
                 .value => {
                     const start = i;
                     i = s.len;
-                    const str = s[start..i];
-                    buf.appendAssumeCapacity(str);
+                    buf[buf_i] = s[start..i];
+                    buf_i += 1;
                 },
             }
         }
