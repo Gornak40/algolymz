@@ -1,0 +1,30 @@
+[field@name]
+text = Имя
+required
+
+[field@surname]
+text = Фамилия
+required
+
+[field@fathers_name]
+text = Отчество
+
+[field@date]
+text = Дата рождения
+type = date
+required
+
+[field@expect]
+text = Что вы ждёте от кружка?
+type = text
+required
+
+[form@base]
+$field = name
+$field = surname
+$field = fathers_name
+$field = date
+
+[form@b2025]
+%base
+$field = expect
