@@ -132,8 +132,10 @@ pub const Parser = struct {
         self.base_alloc.destroy(self.arena);
     }
 
+    const Header = struct { []const u8, []const u8 };
+
     pub fn feed(self: *Parser, s: []const u8) !void {
-        var header: ?struct { []const u8, []const u8 } = null;
+        var header: ?Header = null;
         var fields = std.ArrayList(InnerPattern).init(self.arena.allocator());
         var iter = std.mem.splitScalar(u8, s, '\n');
         while (iter.next()) |line| {
@@ -142,7 +144,7 @@ pub const Parser = struct {
             switch (p) {
                 .header => |cur_header| {
                     if (header) |prev_header| {
-                        try self.appendField(prev_header, try fields.toOwnedSlice());
+                        try self.appendFields(prev_header, try fields.toOwnedSlice());
                     }
                     header = cur_header;
                 },
@@ -152,17 +154,23 @@ pub const Parser = struct {
                 .empty => continue,
             }
         } else if (header) |cur_header| {
-            try self.appendField(cur_header, try fields.toOwnedSlice());
+            try self.appendFields(cur_header, try fields.toOwnedSlice());
         }
     }
 
-    fn appendField(self: *Parser, header: struct { []const u8, []const u8 }, fields: []const InnerPattern) !void {
+    fn appendFields(self: *Parser, header: Header, fields: []const InnerPattern) !void {
         var entry = try self.data.getOrPut(header[0]);
         if (!entry.found_existing) {
             entry.value_ptr.* = Collection.init(self.arena.allocator());
         }
         const res = try entry.value_ptr.getOrPutValue(header[1], fields);
         if (res.found_existing) return error.DuplicateName;
+    }
+
+    fn getFields(self: Parser, header: Header) ?[]const InnerPattern {
+        return if (self.data.getPtr(header[0])) |items| {
+            if (items.get(header[1])) |result| result else null;
+        } else null;
     }
 };
 
